@@ -48,7 +48,7 @@ export default function Home() {
   }, [isUserLoading, user, auth]);
 
   const handleAddCustomer = (newCustomer: { name: string; email: string; phone: string }) => {
-    if (!user || !firestore || !pendingCustomersRef) {
+    if (!user || !firestore || !activeCustomersRef || !pendingCustomersRef) {
       toast({ title: "Error", description: "You must be logged in to add a customer.", variant: "destructive" });
       return;
     }
@@ -57,11 +57,14 @@ export default function Home() {
       email: newCustomer.email,
       phoneNumber: newCustomer.phone,
     };
-    // Firestore will auto-generate an ID
-    addDocumentNonBlocking(pendingCustomersRef, {...customerData, status: 'pending'});
+    
+    const targetRef = view === 'active' ? activeCustomersRef : pendingCustomersRef;
+    const status = view;
+
+    addDocumentNonBlocking(targetRef, {...customerData, status: status});
     toast({
       title: "Customer Added",
-      description: `${newCustomer.name} has been added to the pending list.`,
+      description: `${newCustomer.name} has been added to the ${status} list.`,
     });
   };
 
@@ -138,7 +141,7 @@ export default function Home() {
                 <DialogHeader>
                   <DialogTitle>Add a New Customer</DialogTitle>
                   <DialogDescription>
-                    Enter the customer's details. They will be added to the pending list.
+                    Enter the customer's details. They will be added to the {view} list.
                   </DialogDescription>
                 </DialogHeader>
                 <AddCustomerForm 
