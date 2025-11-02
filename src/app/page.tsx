@@ -146,20 +146,21 @@ export default function Home() {
 
     const dataForSheet = customersToDownload.map(customer => ({
       Name: customer.name,
-      'Mobile Number': customer.phoneNumber,
+      // Ensure phone number is treated as a string for the export
+      'Mobile Number': String(customer.phoneNumber),
       'Activation Date': customer.createdAt ? format(customer.createdAt.toDate(), 'MMMM d, yyyy') : 'N/A'
     }));
     
-    const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
+    const worksheet = XLSX.utils.json_to_sheet(dataForSheet, {
+      skipHeader: false,
+    });
 
-    // Force the 'Mobile Number' column to be treated as text
-    const mobileNumberColumn = 'B';
-    for (let i = 2; i <= (customersToDownload.length + 1); i++) {
-        const cellRef = `${mobileNumberColumn}${i}`;
-        if (worksheet[cellRef]) {
-            worksheet[cellRef].t = 's';
-        }
-    }
+    // Set column widths
+    worksheet['!cols'] = [
+        { wch: 25 }, // Name
+        { wch: 20 }, // Mobile Number
+        { wch: 20 }  // Activation Date
+    ];
     
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, `${title} List`);
