@@ -25,6 +25,7 @@ import { useAuth, useCollection, useFirestore, useMemoFirebase, useUser } from "
 import { addDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { collection, doc, writeBatch } from "firebase/firestore";
 import { initiateAnonymousSignIn } from "@/firebase/non-blocking-login";
+import { PasswordProtection } from "@/components/password-protection";
 
 export default function Home() {
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
@@ -33,6 +34,7 @@ export default function Home() {
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
   const firestore = useFirestore();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const activeCustomersRef = useMemoFirebase(() => firestore ? collection(firestore, 'active_customers') : null, [firestore]);
   const pendingCustomersRef = useMemoFirebase(() => firestore ? collection(firestore, 'pending_customers') : null, [firestore]);
@@ -42,10 +44,10 @@ export default function Home() {
 
   // Sign in user anonymously if not logged in
   useEffect(() => {
-    if (auth && !isUserLoading && !user) {
+    if (isAuthenticated && auth && !isUserLoading && !user) {
       initiateAnonymousSignIn(auth);
     }
-  }, [isUserLoading, user, auth]);
+  }, [isAuthenticated, isUserLoading, user, auth]);
 
   const handleAddCustomer = (newCustomer: { name: string; email: string; phone: string }) => {
     if (!user || !firestore || !activeCustomersRef || !pendingCustomersRef) {
@@ -120,7 +122,11 @@ export default function Home() {
   
   const customersToShow = view === 'active' ? activeCustomers : pendingCustomers;
   const title = view === 'active' ? "Active Customers" : "Pending Customers";
-  const isLoading = (view === 'active' ? isActiveLoading : isPendingLoading) || isUserLoading;
+  const isLoading = (view === 'active' ? isActiveLoading : isPendingLoading) || (isUserLoading && isAuthenticated);
+
+  if (!isAuthenticated) {
+    return <PasswordProtection onAuthenticated={() => setIsAuthenticated(true)} />;
+  }
 
   return (
     <main className="min-h-screen bg-background font-body text-foreground p-4 sm:p-6 md:p-8">
