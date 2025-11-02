@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { UserPlus, MoreVertical, Check } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const initialPendingCustomers: Customer[] = [
   { id: 'pending-1', name: 'Elara Vance', email: 'elara.vance@email.co', phone: '111-111-1111' },
@@ -36,23 +37,44 @@ export default function Home() {
   const [activeCustomers, setActiveCustomers] = useState<Customer[]>(initialActiveCustomers);
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [view, setView] = useState<"active" | "pending">("active");
+  const { toast } = useToast();
 
   const handleAddCustomer = (newCustomer: { name: string; email: string; phone: string }) => {
     setPendingCustomers(prev => [...prev, { id: crypto.randomUUID(), ...newCustomer }]);
+    toast({
+      title: "Customer Added",
+      description: `${newCustomer.name} has been added to the pending list.`,
+    });
   };
 
   const handleDeleteCustomer = (customerId: string) => {
+    const customerToDelete = pendingCustomers.find(c => c.id === customerId);
     setPendingCustomers(prev => prev.filter(c => c.id !== customerId));
     setActiveCustomers(prev => prev.filter(c => c.id !== customerId));
+    if (customerToDelete) {
+      toast({
+        title: "Customer Deleted",
+        description: `${customerToDelete.name} has been deleted.`,
+        variant: "destructive",
+      });
+    }
   };
 
   const handleSwitchCustomer = (customer: Customer, from: "pending" | "active") => {
     if (from === "pending") {
       setPendingCustomers(prev => prev.filter(c => c.id !== customer.id));
       setActiveCustomers(prev => [customer, ...prev]);
+      toast({
+        title: "Customer Activated",
+        description: `${customer.name} has been moved to the active list.`,
+      });
     } else {
       setActiveCustomers(prev => prev.filter(c => c.id !== customer.id));
       setPendingCustomers(prev => [customer, ...prev]);
+       toast({
+        title: "Customer Moved to Pending",
+        description: `${customer.name} has been moved to the pending list.`,
+      });
     }
   };
   
