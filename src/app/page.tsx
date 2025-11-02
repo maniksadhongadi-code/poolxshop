@@ -40,23 +40,33 @@ export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthReady, setIsAuthReady] = useState(false);
 
-  // Sign in user anonymously if not logged in
+  // This effect runs on the client to check for password authentication
+  // and initiate anonymous sign-in if needed.
   useEffect(() => {
-    // This effect now runs on the client after hydration
+    // This part should only run on the client after hydration
     const storedAuth = localStorage.getItem("is-authenticated") === "true";
     setIsAuthenticated(storedAuth);
-    if (storedAuth && auth && !isUserLoading && !user) {
-      initiateAnonymousSignIn(auth);
-    }
-    // Indicate that the initial auth check is done
+
     if (!isUserLoading) {
+      // If password is authenticated and there is no user, sign in.
+      if (storedAuth && auth && !user) {
+        initiateAnonymousSignIn(auth);
+      }
+      // We are ready to render the UI once the initial user check is complete.
       setIsAuthReady(true);
     }
   }, [isUserLoading, user, auth]);
 
-  // Only create refs if authenticated and user is available
-  const activeCustomersRef = useMemoFirebase(() => (isAuthReady && user && firestore) ? collection(firestore, 'active_customers') : null, [isAuthReady, user, firestore]);
-  const pendingCustomersRef = useMemoFirebase(() => (isAuthReady && user && firestore) ? collection(firestore, 'pending_customers') : null, [isAuthReady, user, firestore]);
+
+  // Memoize Firestore references. They will be null until auth is ready and a user exists.
+  const activeCustomersRef = useMemoFirebase(() =>
+    (isAuthReady && user && firestore) ? collection(firestore, 'active_customers') : null,
+    [isAuthReady, user, firestore]
+  );
+  const pendingCustomersRef = useMemoFirebase(() =>
+    (isAuthReady && user && firestore) ? collection(firestore, 'pending_customers') : null,
+    [isAuthReady, user, firestore]
+  );
 
   const { data: activeCustomers, isLoading: isActiveLoading } = useCollection<Customer>(activeCustomersRef);
   const { data: pendingCustomers, isLoading: isPendingLoading } = useCollection<Customer>(pendingCustomersRef);
@@ -64,7 +74,7 @@ export default function Home() {
   const handlePasswordAuthenticated = () => {
     localStorage.setItem("is-authenticated", "true");
     setIsAuthenticated(true);
-    // After password auth, immediately try to sign in anonymously
+    // After password auth, immediately try to sign in anonymously if there's no user.
     if(auth && !user) {
       initiateAnonymousSignIn(auth);
     }
@@ -91,6 +101,7 @@ export default function Home() {
       title: "Customer Added",
       description: `${newCustomer.name} has been added to the ${status} list.`,
     });
+    setAddDialogOpen(false);
   };
 
   const handleDeleteCustomer = (customerId: string) => {
@@ -115,6 +126,7 @@ export default function Home() {
     if (!firestore) return;
     const batch = writeBatch(firestore);
     
+    // Preserve the original creation date when switching
     const customerToSwitch = { ...customer };
 
     if (from === "pending") {
@@ -163,7 +175,7 @@ export default function Home() {
     const worksheet = XLSX.utils.json_to_sheet(dataForSheet, {
       skipHeader: false,
     });
-
+    
     // Set column widths
     worksheet['!cols'] = [
         { wch: 25 }, // Name
@@ -172,8 +184,9 @@ export default function Home() {
     ];
     
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, `${title} List`);
-    XLSX.writeFile(workbook, `${title}.xlsx`);
+    const sheetName = `${view.charAt(0).toUpperCase() + view.slice(1)} Customers`;
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    XLSX.writeFile(workbook, `${sheetName}.xlsx`);
 
      toast({
       title: "Download Started",
@@ -183,8 +196,9 @@ export default function Home() {
   
   const customersToShow = view === 'active' ? activeCustomers : pendingCustomers;
   const title = view === 'active' ? "Active Customers" : "Pending Customers";
-  const isLoading = isUserLoading || (isAuthReady && user && (isActiveLoading || isPendingLoading));
+  const isLoading = isUserLoading || (isAuthenticated && (isActiveLoading || isPendingLoading));
 
+  // Render a loading screen until we're sure about the auth state
   if (!isAuthReady) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -193,6 +207,7 @@ export default function Home() {
     );
   }
 
+  // If not password-authenticated, show the password screen
   if (!isAuthenticated) {
     return <PasswordProtection onAuthenticated={handlePasswordAuthenticated} />;
   }
@@ -254,7 +269,7 @@ export default function Home() {
         <section>
           <h2 className="text-2xl font-semibold mb-4 pb-2 border-b-2 border-primary/50">{title}</h2>
           <div className="space-y-4">
-            {isLoading && <p>Loading...</p>}
+            {isLoading && <p>Loading customers...</p>}
             {!isLoading && customersToShow && customersToShow.length > 0 ? (
               customersToShow.map(customer => (
                 <CustomerCard
@@ -278,3 +293,4 @@ export default function Home() {
     </main>
   );
 }
+
