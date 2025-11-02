@@ -19,13 +19,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { UserPlus, MoreVertical, Check } from "lucide-react";
+import { UserPlus, MoreVertical, Check, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth, useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
-import { collection, doc, writeBatch, serverTimestamp } from "firebase/firestore";
+import { collection, doc, writeBatch, serverTimestamp, Timestamp } from "firebase/firestore";
 import { initiateAnonymousSignIn } from "@/firebase/non-blocking-login";
 import { PasswordProtection } from "@/components/password-protection";
+import * as XLSX from 'xlsx';
+import { format } from "date-fns";
 
 export default function Home() {
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
@@ -54,11 +56,16 @@ export default function Home() {
       toast({ title: "Error", description: "You must be logged in to add a customer.", variant: "destructive" });
       return;
     }
+
+    const creationDate = new Date();
+    const expiryDate = new Date(creationDate.setFullYear(creationDate.getFullYear() + 1));
+    
     const customerData = {
       name: newCustomer.name,
       email: newCustomer.email,
       phoneNumber: newCustomer.phone,
       createdAt: serverTimestamp(),
+      expiryDate: Timestamp.fromDate(expiryDate),
     };
     
     const targetRef = view === 'active' ? activeCustomersRef : pendingCustomersRef;
@@ -92,11 +99,15 @@ export default function Home() {
   const handleSwitchCustomer = async (customer: Customer, from: "pending" | "active") => {
     if (!firestore) return;
     const batch = writeBatch(firestore);
+    
+    // Create a new object to avoid modifying the original customer object directly
+    const customerToSwitch = { ...customer };
+
     if (from === "pending") {
       const fromRef = doc(firestore, "pending_customers", customer.id);
       const toRef = doc(firestore, "active_customers", customer.id);
       batch.delete(fromRef);
-      batch.set(toRef, { ...customer, status: 'active', createdAt: customer.createdAt });
+      batch.set(toRef, { ...customerToSwitch, status: 'active' });
       toast({
         title: "Customer Activated",
         description: `${customer.name} has been moved to the active list.`,
@@ -105,7 +116,7 @@ export default function Home() {
       const fromRef = doc(firestore, "active_customers", customer.id);
       const toRef = doc(firestore, "pending_customers", customer.id);
       batch.delete(fromRef);
-      batch.set(toRef, { ...customer, status: 'pending', createdAt: customer.createdAt });
+      batch.set(toRef, { ...customerToSwitch, status: 'pending' });
       toast({
         title: "Customer Moved to Pending",
         description: `${customer.name} has been moved to the pending list.`,
@@ -118,6 +129,30 @@ export default function Home() {
          description: "Could not update customer status.",
          variant: "destructive",
        });
+    });
+  };
+
+  const handleDownload = () => {
+    const customersToDownload = view === 'active' ? activeCustomers : pendingCustomers;
+    if (!customersToDownload || customersToDownload.length === 0) {
+      toast({ title: "No Data", description: `There are no ${view} customers to download.`, variant: "destructive" });
+      return;
+    }
+
+    const dataForSheet = customersToDownload.map(customer => ({
+      Name: customer.name,
+      'Mobile Number': customer.phoneNumber,
+      'Expiry Date': customer.expiryDate ? format(customer.expiryDate.toDate(), 'MMMM d, yyyy') : 'N/A'
+    }));
+    
+    const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, `${title} List`);
+    XLSX.writeFile(workbook, `${title}.xlsx`);
+
+     toast({
+      title: "Download Started",
+      description: `Your ${view} customer list is downloading.`,
     });
   };
   
@@ -137,6 +172,10 @@ export default function Home() {
             Customer Hub
           </h1>
           <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleDownload}>
+              <Download />
+              Download List
+            </Button>
             <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>
               <DialogTrigger asChild>
                 <Button>

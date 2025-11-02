@@ -7,4 +7,5 @@ export type Customer = {
   phoneNumber: string;
   status: 'pending' | 'active';
   createdAt: Timestamp;
+  expiryDate?: Timestamp;
 };
