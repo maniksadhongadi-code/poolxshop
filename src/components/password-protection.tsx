@@ -48,7 +48,7 @@ export function PasswordProtection({ onAuthenticated }: PasswordProtectionProps)
              <ShieldCheck className="w-12 h-12 text-primary" />
           </div>
           <CardTitle className="text-2xl">Authentication Required</CardTitle>
-          <CardDescription>Please enter the password to access the Customer Hub.</CardDescription>
+          <CardDescription>Please enter the password to access the Coustomers Hub.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Input

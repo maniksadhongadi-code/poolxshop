@@ -220,7 +220,7 @@ export default function Home() {
       <div className="max-w-4xl mx-auto">
         <header className="flex flex-col sm:flex-row items-center justify-between mb-8 gap-4">
           <h1 className="text-3xl font-headline font-bold text-primary-foreground bg-primary py-2 px-4 rounded-lg shadow-md">
-            Customer Hub
+            Coustomers Hub
           </h1>
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={handleDownload}>
