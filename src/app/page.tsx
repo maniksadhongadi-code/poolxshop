@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
@@ -37,28 +38,36 @@ export default function Home() {
   const auth = useAuth();
   const firestore = useFirestore();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  const activeCustomersRef = useMemoFirebase(() => firestore ? collection(firestore, 'active_customers') : null, [firestore]);
-  const pendingCustomersRef = useMemoFirebase(() => firestore ? collection(firestore, 'pending_customers') : null, [firestore]);
-
-  const { data: activeCustomers, isLoading: isActiveLoading } = useCollection<Customer>(activeCustomersRef);
-  const { data: pendingCustomers, isLoading: isPendingLoading } = useCollection<Customer>(pendingCustomersRef);
+  const [isAuthReady, setIsAuthReady] = useState(false);
 
   // Sign in user anonymously if not logged in
   useEffect(() => {
     // This effect now runs on the client after hydration
-    if (typeof window !== 'undefined') {
-      const storedAuth = localStorage.getItem("is-authenticated") === "true";
-      setIsAuthenticated(storedAuth);
-      if (storedAuth && auth && !isUserLoading && !user) {
-        initiateAnonymousSignIn(auth);
-      }
+    const storedAuth = localStorage.getItem("is-authenticated") === "true";
+    setIsAuthenticated(storedAuth);
+    if (storedAuth && auth && !isUserLoading && !user) {
+      initiateAnonymousSignIn(auth);
+    }
+    // Indicate that the initial auth check is done
+    if (!isUserLoading) {
+      setIsAuthReady(true);
     }
   }, [isUserLoading, user, auth]);
+
+  // Only create refs if authenticated and user is available
+  const activeCustomersRef = useMemoFirebase(() => (isAuthReady && user && firestore) ? collection(firestore, 'active_customers') : null, [isAuthReady, user, firestore]);
+  const pendingCustomersRef = useMemoFirebase(() => (isAuthReady && user && firestore) ? collection(firestore, 'pending_customers') : null, [isAuthReady, user, firestore]);
+
+  const { data: activeCustomers, isLoading: isActiveLoading } = useCollection<Customer>(activeCustomersRef);
+  const { data: pendingCustomers, isLoading: isPendingLoading } = useCollection<Customer>(pendingCustomersRef);
 
   const handlePasswordAuthenticated = () => {
     localStorage.setItem("is-authenticated", "true");
     setIsAuthenticated(true);
+    // After password auth, immediately try to sign in anonymously
+    if(auth && !user) {
+      initiateAnonymousSignIn(auth);
+    }
   }
 
   const handleAddCustomer = (newCustomer: { name: string; email: string; phone: string }) => {
@@ -174,7 +183,15 @@ export default function Home() {
   
   const customersToShow = view === 'active' ? activeCustomers : pendingCustomers;
   const title = view === 'active' ? "Active Customers" : "Pending Customers";
-  const isLoading = (view === 'active' ? isActiveLoading : isPendingLoading) || isUserLoading;
+  const isLoading = isUserLoading || (isAuthReady && user && (isActiveLoading || isPendingLoading));
+
+  if (!isAuthReady) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p>Loading...</p>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return <PasswordProtection onAuthenticated={handlePasswordAuthenticated} />;
