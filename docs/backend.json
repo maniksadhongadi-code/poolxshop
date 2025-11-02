@@ -28,6 +28,11 @@
           "type": "string",
           "description": "Status of the customer (pending or active).",
           "enum": ["pending", "active"]
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "The date the customer was created.",
+          "format": "date-time"
         }
       },
       "required": [
@@ -35,7 +40,8 @@
         "name",
         "email",
         "phoneNumber",
-        "status"
+        "status",
+        "createdAt"
       ]
     }
   },

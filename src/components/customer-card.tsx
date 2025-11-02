@@ -3,7 +3,7 @@
 import type { Customer } from "@/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Trash2, ArrowRightLeft, MoreVertical } from "lucide-react";
+import { Trash2, ArrowRightLeft, MoreVertical, CalendarIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +23,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { buttonVariants } from "@/components/ui/button";
+import { format } from "date-fns";
 
 type CustomerCardProps = {
   customer: Customer;
@@ -33,6 +34,8 @@ type CustomerCardProps = {
 
 export function CustomerCard({ customer, listType, onSwitch, onDelete }: CustomerCardProps) {
   const switchLabel = listType === "pending" ? "Move to Active" : "Move to Pending";
+  
+  const formattedDate = customer.createdAt ? format(customer.createdAt.toDate(), "MMMM d, yyyy") : 'Date not available';
 
   return (
     <Card className="transition-shadow duration-300 hover:shadow-xl">
@@ -88,6 +91,12 @@ export function CustomerCard({ customer, listType, onSwitch, onDelete }: Custome
       <CardContent>
          <p className="text-sm text-muted-foreground">{customer.phoneNumber}</p>
       </CardContent>
+      <CardFooter className="flex justify-end pt-2">
+        <div className="flex items-center text-xs text-muted-foreground">
+          <CalendarIcon className="mr-1.5 h-4 w-4" />
+          <span>{formattedDate}</span>
+        </div>
+      </CardFooter>
     </Card>
   );
 }

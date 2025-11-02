@@ -23,7 +23,7 @@ import { UserPlus, MoreVertical, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth, useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
-import { collection, doc, writeBatch } from "firebase/firestore";
+import { collection, doc, writeBatch, serverTimestamp } from "firebase/firestore";
 import { initiateAnonymousSignIn } from "@/firebase/non-blocking-login";
 import { PasswordProtection } from "@/components/password-protection";
 
@@ -54,10 +54,11 @@ export default function Home() {
       toast({ title: "Error", description: "You must be logged in to add a customer.", variant: "destructive" });
       return;
     }
-    const customerData: Omit<Customer, 'id' | 'status'> = {
+    const customerData = {
       name: newCustomer.name,
       email: newCustomer.email,
       phoneNumber: newCustomer.phone,
+      createdAt: serverTimestamp(),
     };
     
     const targetRef = view === 'active' ? activeCustomersRef : pendingCustomersRef;
