@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { Customer } from "@/types";
 import { AddCustomerForm } from "@/components/add-customer-form";
 import { CustomerCard } from "@/components/customer-card";
@@ -21,26 +21,44 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { UserPlus, MoreVertical, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-const initialPendingCustomers: Customer[] = [
-  { id: 'pending-1', name: 'Elara Vance', email: 'elara.vance@email.co', phone: '111-111-1111' },
-  { id: 'pending-2', name: 'Finn Darby', email: 'finn.darby@email.co', phone: '222-222-2222' },
-];
-
-const initialActiveCustomers: Customer[] = [
-  { id: 'active-1', name: 'Liam Hollis', email: 'liam.hollis@email.co', phone: '333-333-3333' },
-];
-
+import { useAuth, useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
+import { addDocumentNonBlocking, deleteDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { collection, deleteDoc, doc, writeBatch } from "firebase/firestore";
+import { initiateAnonymousSignIn } from "@/firebase/non-blocking-login";
 
 export default function Home() {
-  const [pendingCustomers, setPendingCustomers] = useState<Customer[]>(initialPendingCustomers);
-  const [activeCustomers, setActiveCustomers] = useState<Customer[]>(initialActiveCustomers);
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [view, setView] = useState<"active" | "pending">("active");
   const { toast } = useToast();
+  const { user, isUserLoading } = useUser();
+  const auth = useAuth();
+  const firestore = useFirestore();
+
+  const activeCustomersRef = useMemoFirebase(() => collection(firestore, 'active_customers'), [firestore]);
+  const pendingCustomersRef = useMemoFirebase(() => collection(firestore, 'pending_customers'), [firestore]);
+
+  const { data: activeCustomers, isLoading: isActiveLoading } = useCollection<Customer>(activeCustomersRef);
+  const { data: pendingCustomers, isLoading: isPendingLoading } = useCollection<Customer>(pendingCustomersRef);
+
+  // Sign in user anonymously if not logged in
+  useState(() => {
+    if (!isUserLoading && !user) {
+      initiateAnonymousSignIn(auth);
+    }
+  });
 
   const handleAddCustomer = (newCustomer: { name: string; email: string; phone: string }) => {
-    setPendingCustomers(prev => [...prev, { id: crypto.randomUUID(), ...newCustomer }]);
+    if (!user) {
+      toast({ title: "Error", description: "You must be logged in to add a customer.", variant: "destructive" });
+      return;
+    }
+    const customerData: Omit<Customer, 'id' | 'status'> = {
+      name: newCustomer.name,
+      email: newCustomer.email,
+      phoneNumber: newCustomer.phone,
+    };
+    const docWithId = { ...customerData, id: user.uid, status: 'pending' };
+    addDocumentNonBlocking(pendingCustomersRef, docWithId);
     toast({
       title: "Customer Added",
       description: `${newCustomer.name} has been added to the pending list.`,
@@ -48,10 +66,14 @@ export default function Home() {
   };
 
   const handleDeleteCustomer = (customerId: string) => {
-    const customerToDelete = pendingCustomers.find(c => c.id === customerId);
-    setPendingCustomers(prev => prev.filter(c => c.id !== customerId));
-    setActiveCustomers(prev => prev.filter(c => c.id !== customerId));
+    const customerToDelete = pendingCustomers?.find(c => c.id === customerId) || activeCustomers?.find(c => c.id === customerId);
     if (customerToDelete) {
+        if (customerToDelete.status === 'pending') {
+            deleteDocumentNonBlocking(doc(firestore, "pending_customers", customerId));
+        } else {
+            deleteDocumentNonBlocking(doc(firestore, "active_customers", customerId));
+        }
+      
       toast({
         title: "Customer Deleted",
         description: `${customerToDelete.name} has been deleted.`,
@@ -60,26 +82,33 @@ export default function Home() {
     }
   };
 
-  const handleSwitchCustomer = (customer: Customer, from: "pending" | "active") => {
+  const handleSwitchCustomer = async (customer: Customer, from: "pending" | "active") => {
+    const batch = writeBatch(firestore);
     if (from === "pending") {
-      setPendingCustomers(prev => prev.filter(c => c.id !== customer.id));
-      setActiveCustomers(prev => [customer, ...prev]);
+      const fromRef = doc(firestore, "pending_customers", customer.id);
+      const toRef = doc(firestore, "active_customers", customer.id);
+      batch.delete(fromRef);
+      batch.set(toRef, { ...customer, status: 'active' });
       toast({
         title: "Customer Activated",
         description: `${customer.name} has been moved to the active list.`,
       });
     } else {
-      setActiveCustomers(prev => prev.filter(c => c.id !== customer.id));
-      setPendingCustomers(prev => [customer, ...prev]);
-       toast({
+      const fromRef = doc(firestore, "active_customers", customer.id);
+      const toRef = doc(firestore, "pending_customers", customer.id);
+      batch.delete(fromRef);
+      batch.set(toRef, { ...customer, status: 'pending' });
+      toast({
         title: "Customer Moved to Pending",
         description: `${customer.name} has been moved to the pending list.`,
       });
     }
+    await batch.commit();
   };
   
   const customersToShow = view === 'active' ? activeCustomers : pendingCustomers;
   const title = view === 'active' ? "Active Customers" : "Pending Customers";
+  const isLoading = view === 'active' ? isActiveLoading : isPendingLoading;
 
   return (
     <main className="min-h-screen bg-background font-body text-foreground p-4 sm:p-6 md:p-8">
@@ -134,7 +163,8 @@ export default function Home() {
         <section>
           <h2 className="text-2xl font-semibold mb-4 pb-2 border-b-2 border-primary/50">{title}</h2>
           <div className="space-y-4">
-            {customersToShow.length > 0 ? (
+            {isLoading && <p>Loading...</p>}
+            {!isLoading && customersToShow && customersToShow.length > 0 ? (
               customersToShow.map(customer => (
                 <CustomerCard
                   key={customer.id}
@@ -145,9 +175,11 @@ export default function Home() {
                 />
               ))
             ) : (
-              <div className="flex items-center justify-center h-48 rounded-lg border-2 border-dashed border-border text-muted-foreground p-8">
-                <p>No {view} customers.</p>
-              </div>
+              !isLoading && (
+                <div className="flex items-center justify-center h-48 rounded-lg border-2 border-dashed border-border text-muted-foreground p-8">
+                  <p>No {view} customers.</p>
+                </div>
+              )
             )}
           </div>
         </section>

@@ -1,89 +1,20 @@
-/**
- * @fileoverview Firestore Security Rules for the Customer Hub application.
- *
- * Core Philosophy:
- * This ruleset enforces a role-based access control model, distinguishing between active and pending customers.
- * Active customers have stricter access control, while pending customers have more lenient read access.
- *
- * Data Structure:
- * The database stores customer data in two top-level collections:
- *   - /active_customers/{customerId}: For active customer records.
- *   - /pending_customers/{customerId}: For pending customer records.
- *
- * Key Security Decisions:
- * - No user listing is allowed for either collection to prevent unauthorized data scraping.
- * - All writes to /active_customers are restricted to authenticated users who own the customer document.
- * - Read access to /active_customers is public.
- * - Writes to /pending_customers are restricted to authenticated users who own the customer document.
- * - Read access to /pending_customers is public.
- *
- * Denormalization for Authorization:
- * To avoid costly `get()` calls, the `customerId` is used in the document ID, allowing direct ownership checks based on the path.
- */
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * @description Controls access to active customer documents.
-     * @path /active_customers/{customerId}
-     * @allow (get, list) Any user can read active customer data.
-     * @allow (create, update, delete) Only the customer themselves (identified by customerId) can modify their data.
-     * @deny An unauthenticated user attempting to create an active customer document.
-     * @principle Enforces document ownership for writes and enables public reads for active customers.
-     */
-    match /active_customers/{customerId} {
-      // Function to check if the user is signed in
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      // Function to check if the user is the owner of the document
-      function isOwner(customerId) {
-        return request.auth.uid == customerId;
-      }
-
-      // Function to check if the user is the existing owner of the document
-      function isExistingOwner(customerId) {
-        return isOwner(customerId) && resource != null;
-      }
-      allow get: if true;
-      allow list: if true;
-
-      allow create: if isSignedIn() && isOwner(customerId) && request.resource.data.id == customerId;
-      allow update: if isExistingOwner(customerId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(customerId);
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
     }
 
-    /**
-     * @description Controls access to pending customer documents.
-     * @path /pending_customers/{customerId}
-     * @allow (get, list) Any user can read pending customer data.
-     * @allow (create, update, delete) Only the customer themselves (identified by customerId) can modify their data.
-     * @deny An unauthenticated user attempting to create a pending customer document.
-     * @principle Enforces document ownership for writes and enables public reads for pending customers.
-     */
+    match /active_customers/{customerId} {
+      allow read: if true;
+      allow create, update, delete: if isOwner(customerId);
+    }
+
     match /pending_customers/{customerId} {
-      // Function to check if the user is signed in
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      // Function to check if the user is the owner of the document
-      function isOwner(customerId) {
-        return request.auth.uid == customerId;
-      }
-
-      // Function to check if the user is the existing owner of the document
-      function isExistingOwner(customerId) {
-        return isOwner(customerId) && resource != null;
-      }
-      allow get: if true;
-      allow list: if true;
-
-      allow create: if isSignedIn() && isOwner(customerId) && request.resource.data.id == customerId;
-      allow update: if isExistingOwner(customerId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(customerId);
+      allow read: if true;
+      allow create, update, delete: if isOwner(customerId);
     }
   }
 }

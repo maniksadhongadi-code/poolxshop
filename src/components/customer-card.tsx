@@ -52,7 +52,7 @@ export function CustomerCard({ customer, listType, onSwitch, onDelete }: Custome
               <ArrowRightLeft className="mr-2" />
               <span>{switchLabel}</span>
             </DropdownMenuItem>
-            {listType === "pending" && onDelete && (
+            {onDelete && (
               <>
                 <DropdownMenuSeparator />
                 <AlertDialog>
@@ -69,7 +69,7 @@ export function CustomerCard({ customer, listType, onSwitch, onDelete }: Custome
                     <AlertDialogHeader>
                       <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete the customer from the pending list.
+                        This action cannot be undone. This will permanently delete the customer.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -86,7 +86,7 @@ export function CustomerCard({ customer, listType, onSwitch, onDelete }: Custome
         </DropdownMenu>
       </CardHeader>
       <CardContent>
-         <p className="text-sm text-muted-foreground">{customer.phone}</p>
+         <p className="text-sm text-muted-foreground">{customer.phoneNumber}</p>
       </CardContent>
     </Card>
   );

@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "Customer": {
@@ -9,6 +10,10 @@
         "id": {
           "type": "string",
           "description": "Unique identifier for the Customer entity."
+        },
+        "name": {
+            "type": "string",
+            "description": "Name of the customer."
         },
         "email": {
           "type": "string",
@@ -22,11 +27,12 @@
         "status": {
           "type": "string",
           "description": "Status of the customer (pending or active).",
-          "format": "string"
+          "enum": ["pending", "active"]
         }
       },
       "required": [
         "id",
+        "name",
         "email",
         "phoneNumber",
         "status"
