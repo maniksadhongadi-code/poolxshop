@@ -151,6 +151,16 @@ export default function Home() {
     }));
     
     const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
+
+    // Force the 'Mobile Number' column to be treated as text
+    const mobileNumberColumn = 'B';
+    for (let i = 2; i <= (customersToDownload.length + 1); i++) {
+        const cellRef = `${mobileNumberColumn}${i}`;
+        if (worksheet[cellRef]) {
+            worksheet[cellRef].t = 's';
+        }
+    }
+    
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, `${title} List`);
     XLSX.writeFile(workbook, `${title}.xlsx`);
