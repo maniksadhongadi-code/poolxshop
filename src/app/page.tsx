@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import type { Customer } from "@/types";
 import { AddCustomerForm } from "@/components/add-customer-form";
 import { CustomerCard } from "@/components/customer-card";
@@ -22,8 +22,8 @@ import {
 import { UserPlus, MoreVertical, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth, useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { addDocumentNonBlocking, deleteDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
-import { collection, deleteDoc, doc, writeBatch } from "firebase/firestore";
+import { addDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { collection, doc, writeBatch } from "firebase/firestore";
 import { initiateAnonymousSignIn } from "@/firebase/non-blocking-login";
 
 export default function Home() {
@@ -34,21 +34,21 @@ export default function Home() {
   const auth = useAuth();
   const firestore = useFirestore();
 
-  const activeCustomersRef = useMemoFirebase(() => collection(firestore, 'active_customers'), [firestore]);
-  const pendingCustomersRef = useMemoFirebase(() => collection(firestore, 'pending_customers'), [firestore]);
+  const activeCustomersRef = useMemoFirebase(() => firestore ? collection(firestore, 'active_customers') : null, [firestore]);
+  const pendingCustomersRef = useMemoFirebase(() => firestore ? collection(firestore, 'pending_customers') : null, [firestore]);
 
   const { data: activeCustomers, isLoading: isActiveLoading } = useCollection<Customer>(activeCustomersRef);
   const { data: pendingCustomers, isLoading: isPendingLoading } = useCollection<Customer>(pendingCustomersRef);
 
   // Sign in user anonymously if not logged in
-  useState(() => {
-    if (!isUserLoading && !user) {
+  useEffect(() => {
+    if (auth && !isUserLoading && !user) {
       initiateAnonymousSignIn(auth);
     }
-  });
+  }, [isUserLoading, user, auth]);
 
   const handleAddCustomer = (newCustomer: { name: string; email: string; phone: string }) => {
-    if (!user) {
+    if (!user || !firestore || !pendingCustomersRef) {
       toast({ title: "Error", description: "You must be logged in to add a customer.", variant: "destructive" });
       return;
     }
@@ -57,8 +57,8 @@ export default function Home() {
       email: newCustomer.email,
       phoneNumber: newCustomer.phone,
     };
-    const docWithId = { ...customerData, id: user.uid, status: 'pending' };
-    addDocumentNonBlocking(pendingCustomersRef, docWithId);
+    // Firestore will auto-generate an ID
+    addDocumentNonBlocking(pendingCustomersRef, {...customerData, status: 'pending'});
     toast({
       title: "Customer Added",
       description: `${newCustomer.name} has been added to the pending list.`,
@@ -66,6 +66,7 @@ export default function Home() {
   };
 
   const handleDeleteCustomer = (customerId: string) => {
+    if (!firestore) return;
     const customerToDelete = pendingCustomers?.find(c => c.id === customerId) || activeCustomers?.find(c => c.id === customerId);
     if (customerToDelete) {
         if (customerToDelete.status === 'pending') {
@@ -83,6 +84,7 @@ export default function Home() {
   };
 
   const handleSwitchCustomer = async (customer: Customer, from: "pending" | "active") => {
+    if (!firestore) return;
     const batch = writeBatch(firestore);
     if (from === "pending") {
       const fromRef = doc(firestore, "pending_customers", customer.id);
@@ -103,12 +105,19 @@ export default function Home() {
         description: `${customer.name} has been moved to the pending list.`,
       });
     }
-    await batch.commit();
+    await batch.commit().catch(error => {
+       console.error("Error switching customer:", error);
+       toast({
+         title: "Error switching customer",
+         description: "Could not update customer status.",
+         variant: "destructive",
+       });
+    });
   };
   
   const customersToShow = view === 'active' ? activeCustomers : pendingCustomers;
   const title = view === 'active' ? "Active Customers" : "Pending Customers";
-  const isLoading = view === 'active' ? isActiveLoading : isPendingLoading;
+  const isLoading = (view === 'active' ? isActiveLoading : isPendingLoading) || isUserLoading;
 
   return (
     <main className="min-h-screen bg-background font-body text-foreground p-4 sm:p-6 md:p-8">
