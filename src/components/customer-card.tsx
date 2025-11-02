@@ -3,7 +3,7 @@
 import type { Customer } from "@/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Trash2, ArrowRightLeft, MoreVertical, CalendarIcon, ShieldAlert } from "lucide-react";
+import { Trash2, ArrowRightLeft, MoreVertical, CalendarIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,7 +36,6 @@ export function CustomerCard({ customer, listType, onSwitch, onDelete }: Custome
   const switchLabel = listType === "pending" ? "Move to Active" : "Move to Pending";
   
   const formattedDate = customer.createdAt && customer.createdAt.toDate ? format(customer.createdAt.toDate(), "MMMM d, yyyy") : 'Date not available';
-  const expiryDate = customer.expiryDate && customer.expiryDate.toDate ? format(customer.expiryDate.toDate(), "MMMM d, yyyy") : 'N/A';
 
   return (
     <Card className="transition-shadow duration-300 hover:shadow-xl">
@@ -92,11 +91,7 @@ export function CustomerCard({ customer, listType, onSwitch, onDelete }: Custome
       <CardContent>
          <p className="text-sm text-muted-foreground">{customer.phoneNumber}</p>
       </CardContent>
-      <CardFooter className="flex justify-between items-center pt-2">
-         <div className="flex items-center text-xs text-muted-foreground">
-            <ShieldAlert className="mr-1.5 h-4 w-4" />
-            <span>Expires: {expiryDate}</span>
-        </div>
+      <CardFooter className="flex justify-end items-center pt-2">
         <div className="flex items-center text-xs text-muted-foreground">
           <CalendarIcon className="mr-1.5 h-4 w-4" />
           <span>Added: {formattedDate}</span>

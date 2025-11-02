@@ -23,7 +23,7 @@ import { UserPlus, MoreVertical, Check, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth, useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
-import { collection, doc, writeBatch, serverTimestamp, Timestamp } from "firebase/firestore";
+import { collection, doc, writeBatch, serverTimestamp } from "firebase/firestore";
 import { initiateAnonymousSignIn } from "@/firebase/non-blocking-login";
 import { PasswordProtection } from "@/components/password-protection";
 import * as XLSX from 'xlsx';
@@ -46,26 +46,32 @@ export default function Home() {
 
   // Sign in user anonymously if not logged in
   useEffect(() => {
-    if (isAuthenticated && auth && !isUserLoading && !user) {
-      initiateAnonymousSignIn(auth);
+    // This effect now runs on the client after hydration
+    if (typeof window !== 'undefined') {
+      const storedAuth = localStorage.getItem("is-authenticated") === "true";
+      setIsAuthenticated(storedAuth);
+      if (storedAuth && auth && !isUserLoading && !user) {
+        initiateAnonymousSignIn(auth);
+      }
     }
-  }, [isAuthenticated, isUserLoading, user, auth]);
+  }, [isUserLoading, user, auth]);
+
+  const handlePasswordAuthenticated = () => {
+    localStorage.setItem("is-authenticated", "true");
+    setIsAuthenticated(true);
+  }
 
   const handleAddCustomer = (newCustomer: { name: string; email: string; phone: string }) => {
     if (!user || !firestore || !activeCustomersRef || !pendingCustomersRef) {
       toast({ title: "Error", description: "You must be logged in to add a customer.", variant: "destructive" });
       return;
     }
-
-    const creationDate = new Date();
-    const expiryDate = new Date(creationDate.setFullYear(creationDate.getFullYear() + 1));
     
     const customerData = {
       name: newCustomer.name,
       email: newCustomer.email,
       phoneNumber: newCustomer.phone,
       createdAt: serverTimestamp(),
-      expiryDate: Timestamp.fromDate(expiryDate),
     };
     
     const targetRef = view === 'active' ? activeCustomersRef : pendingCustomersRef;
@@ -100,7 +106,6 @@ export default function Home() {
     if (!firestore) return;
     const batch = writeBatch(firestore);
     
-    // Create a new object to avoid modifying the original customer object directly
     const customerToSwitch = { ...customer };
 
     if (from === "pending") {
@@ -142,7 +147,7 @@ export default function Home() {
     const dataForSheet = customersToDownload.map(customer => ({
       Name: customer.name,
       'Mobile Number': customer.phoneNumber,
-      'Expiry Date': customer.expiryDate ? format(customer.expiryDate.toDate(), 'MMMM d, yyyy') : 'N/A'
+      'Activation Date': customer.createdAt ? format(customer.createdAt.toDate(), 'MMMM d, yyyy') : 'N/A'
     }));
     
     const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
@@ -158,10 +163,10 @@ export default function Home() {
   
   const customersToShow = view === 'active' ? activeCustomers : pendingCustomers;
   const title = view === 'active' ? "Active Customers" : "Pending Customers";
-  const isLoading = !isAuthenticated || (view === 'active' ? isActiveLoading : isPendingLoading) || isUserLoading;
+  const isLoading = (view === 'active' ? isActiveLoading : isPendingLoading) || isUserLoading;
 
   if (!isAuthenticated) {
-    return <PasswordProtection onAuthenticated={() => setIsAuthenticated(true)} />;
+    return <PasswordProtection onAuthenticated={handlePasswordAuthenticated} />;
   }
 
   return (
