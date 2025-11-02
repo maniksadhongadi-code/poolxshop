@@ -35,7 +35,7 @@ type CustomerCardProps = {
 export function CustomerCard({ customer, listType, onSwitch, onDelete }: CustomerCardProps) {
   const switchLabel = listType === "pending" ? "Move to Active" : "Move to Pending";
   
-  const formattedDate = customer.createdAt ? format(customer.createdAt.toDate(), "MMMM d, yyyy") : 'Date not available';
+  const formattedDate = customer.createdAt && customer.createdAt.toDate ? format(customer.createdAt.toDate(), "MMMM d, yyyy") : 'Date not available';
 
   return (
     <Card className="transition-shadow duration-300 hover:shadow-xl">

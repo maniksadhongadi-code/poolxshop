@@ -96,7 +96,7 @@ export default function Home() {
       const fromRef = doc(firestore, "pending_customers", customer.id);
       const toRef = doc(firestore, "active_customers", customer.id);
       batch.delete(fromRef);
-      batch.set(toRef, { ...customer, status: 'active' });
+      batch.set(toRef, { ...customer, status: 'active', createdAt: customer.createdAt });
       toast({
         title: "Customer Activated",
         description: `${customer.name} has been moved to the active list.`,
@@ -105,7 +105,7 @@ export default function Home() {
       const fromRef = doc(firestore, "active_customers", customer.id);
       const toRef = doc(firestore, "pending_customers", customer.id);
       batch.delete(fromRef);
-      batch.set(toRef, { ...customer, status: 'pending' });
+      batch.set(toRef, { ...customer, status: 'pending', createdAt: customer.createdAt });
       toast({
         title: "Customer Moved to Pending",
         description: `${customer.name} has been moved to the pending list.`,
@@ -123,7 +123,7 @@ export default function Home() {
   
   const customersToShow = view === 'active' ? activeCustomers : pendingCustomers;
   const title = view === 'active' ? "Active Customers" : "Pending Customers";
-  const isLoading = (view === 'active' ? isActiveLoading : isPendingLoading) || (isUserLoading && isAuthenticated);
+  const isLoading = !isAuthenticated || (view === 'active' ? isActiveLoading : isPendingLoading) || isUserLoading;
 
   if (!isAuthenticated) {
     return <PasswordProtection onAuthenticated={() => setIsAuthenticated(true)} />;
