@@ -19,6 +19,7 @@ const phoneRegex = new RegExp(
 );
 
 const formSchema = z.object({
+  name: z.string().min(1, { message: "Name is required." }),
   email: z.string().email({ message: "Invalid email address." }).min(1, { message: "Email is required."}),
   phone: z.string().regex(phoneRegex, { message: "Invalid phone number." }).min(1, { message: "Phone number is required." }),
 });
@@ -32,6 +33,7 @@ export function AddCustomerForm({ onAddCustomer, onFinished }: AddCustomerFormPr
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      name: "",
       email: "",
       phone: "",
     },
@@ -46,6 +48,19 @@ export function AddCustomerForm({ onAddCustomer, onFinished }: AddCustomerFormPr
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-4">
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Name</FormLabel>
+              <FormControl>
+                <Input placeholder="John Doe" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         <FormField
           control={form.control}
           name="email"

@@ -1,10 +1,16 @@
 "use client";
 
-import { useState } from "react";
 import type { Customer } from "@/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Trash2, ArrowRightLeft } from "lucide-react";
+import { Trash2, ArrowRightLeft, MoreVertical } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,69 +31,63 @@ type CustomerCardProps = {
   onDelete?: (customerId: string) => void;
 };
 
-const CLICKS_TO_SWITCH = 4;
-
 export function CustomerCard({ customer, listType, onSwitch, onDelete }: CustomerCardProps) {
-  const [switchClicks, setSwitchClicks] = useState(0);
-
-  const handleSwitchClick = () => {
-    const newClicks = switchClicks + 1;
-    if (newClicks >= CLICKS_TO_SWITCH) {
-      onSwitch(customer, listType);
-      setSwitchClicks(0);
-    } else {
-      setSwitchClicks(newClicks);
-    }
-  };
-  
-  const handleBlur = () => {
-    if (switchClicks > 0) {
-        setSwitchClicks(0);
-    }
-  }
+  const switchLabel = listType === "pending" ? "Move to Active" : "Move to Pending";
 
   return (
-    <Card onBlur={handleBlur} className="transition-shadow duration-300 hover:shadow-xl">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg font-semibold truncate">{customer.email}</CardTitle>
-        <CardDescription>{customer.phone}</CardDescription>
+    <Card className="transition-shadow duration-300 hover:shadow-xl">
+      <CardHeader className="pb-4 flex flex-row items-start justify-between">
+        <div>
+          <CardTitle className="text-lg font-semibold truncate">{customer.name}</CardTitle>
+          <CardDescription>{customer.email}</CardDescription>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <MoreVertical />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onSwitch(customer, listType)}>
+              <ArrowRightLeft className="mr-2" />
+              <span>{switchLabel}</span>
+            </DropdownMenuItem>
+            {listType === "pending" && onDelete && (
+              <>
+                <DropdownMenuSeparator />
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      <Trash2 className="mr-2" />
+                      <span>Delete</span>
+                    </DropdownMenuItem>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete the customer from the pending list.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => onDelete(customer.id)} className={buttonVariants({ variant: "destructive" })}>
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </CardHeader>
-      <CardFooter className="flex justify-between gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleSwitchClick}
-          className="flex-grow"
-          aria-live="polite"
-        >
-          <ArrowRightLeft />
-          <span>Switch</span>
-          {switchClicks > 0 && <span className="ml-2 font-mono text-muted-foreground">({switchClicks}/{CLICKS_TO_SWITCH})</span>}
-        </Button>
-        {listType === "pending" && onDelete && (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="icon" aria-label="Delete customer">
-                <Trash2 />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete the customer from the pending list.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={() => onDelete(customer.id)} className={buttonVariants({ variant: "destructive" })}>
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
-      </CardFooter>
+      <CardContent>
+         <p className="text-sm text-muted-foreground">{customer.phone}</p>
+      </CardContent>
     </Card>
   );
 }

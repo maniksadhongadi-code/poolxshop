@@ -16,12 +16,12 @@ import {
 import { UserPlus } from "lucide-react";
 
 const initialPendingCustomers: Customer[] = [
-  { id: 'pending-1', email: 'elara.vance@email.co', phone: '111-111-1111' },
-  { id: 'pending-2', email: 'finn.darby@email.co', phone: '222-222-2222' },
+  { id: 'pending-1', name: 'Elara Vance', email: 'elara.vance@email.co', phone: '111-111-1111' },
+  { id: 'pending-2', name: 'Finn Darby', email: 'finn.darby@email.co', phone: '222-222-2222' },
 ];
 
 const initialActiveCustomers: Customer[] = [
-  { id: 'active-1', email: 'liam.hollis@email.co', phone: '333-333-3333' },
+  { id: 'active-1', name: 'Liam Hollis', email: 'liam.hollis@email.co', phone: '333-333-3333' },
 ];
 
 
@@ -30,12 +30,13 @@ export default function Home() {
   const [activeCustomers, setActiveCustomers] = useState<Customer[]>(initialActiveCustomers);
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
 
-  const handleAddCustomer = (newCustomer: { email: string; phone: string }) => {
+  const handleAddCustomer = (newCustomer: { name: string; email: string; phone: string }) => {
     setPendingCustomers(prev => [...prev, { id: crypto.randomUUID(), ...newCustomer }]);
   };
 
   const handleDeleteCustomer = (customerId: string) => {
     setPendingCustomers(prev => prev.filter(c => c.id !== customerId));
+    setActiveCustomers(prev => prev.filter(c => c.id !== customerId));
   };
 
   const handleSwitchCustomer = (customer: Customer, from: "pending" | "active") => {
@@ -109,6 +110,7 @@ export default function Home() {
                     customer={customer}
                     listType="active"
                     onSwitch={handleSwitchCustomer}
+                    onDelete={handleDeleteCustomer}
                   />
                 ))
               ) : (
