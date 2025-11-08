@@ -33,20 +33,22 @@ export default function Home() {
   const [isClientReady, setIsClientReady] = useState(false);
 
   useEffect(() => {
-    const storedAuth = localStorage.getItem("is-authenticated") === "true";
-    setIsAuthenticated(storedAuth);
-    setIsClientReady(true);
+    // This check runs only on the client
+    if (typeof window !== 'undefined') {
+        const storedAuth = localStorage.getItem("is-authenticated") === "true";
+        setIsAuthenticated(storedAuth);
+        setIsClientReady(true);
+    }
   }, []);
 
   const firebaseState = useFirebase();
+  const { auth, firestore, user, isUserLoading } = firebaseState || {};
   
   useEffect(() => {
-    if (isClientReady && isAuthenticated && firebaseState?.auth && !firebaseState?.user && !firebaseState?.isUserLoading) {
-      initiateAnonymousSignIn(firebaseState.auth);
+    if (isClientReady && isAuthenticated && auth && !user && !isUserLoading) {
+      initiateAnonymousSignIn(auth);
     }
-  }, [isClientReady, isAuthenticated, firebaseState]);
-
-  const { firestore, user, isUserLoading } = firebaseState || {};
+  }, [isClientReady, isAuthenticated, auth, user, isUserLoading]);
 
   const oneYearCustomersRef = useMemoFirebase(() =>
     (firestore && user) ? collection(firestore, 'one_year_customers') : null,
@@ -192,8 +194,18 @@ export default function Home() {
       'Mobile Number': String(customer.phoneNumber),
       'Activation Date': customer.createdAt ? format(customer.createdAt.toDate(), 'MMMM d, yyyy') : 'N/A'
     }));
-    
-    const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
+
+    // To ensure the phone number is treated as text, we'll explicitly create cells with the 's' (string) type.
+    const worksheetData = [
+      ['Name', 'Mobile Number', 'Activation Date'],
+      ...dataForSheet.map(item => [
+        { v: item['Name'], t: 's' },
+        { v: item['Mobile Number'], t: 's' }, // Explicitly set type to string 's'
+        { v: item['Activation Date'], t: 's' }
+      ])
+    ];
+
+    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
     
     worksheet['!cols'] = [
         { wch: 25 },
