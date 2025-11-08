@@ -26,8 +26,8 @@
         },
         "status": {
           "type": "string",
-          "description": "Status of the customer (pending or active).",
-          "enum": ["pending", "active"]
+          "description": "Status of the customer (one_year, one_month, or pending).",
+          "enum": ["one_year", "one_month", "pending"]
         },
         "createdAt": {
           "type": "string",
@@ -54,17 +54,33 @@
   "firestore": {
     "structure": [
       {
-        "path": "/active_customers/{customerId}",
+        "path": "/one_year_customers/{customerId}",
         "definition": {
           "entityName": "Customer",
           "schema": {
             "$ref": "#/backend/entities/Customer"
           },
-          "description": "Stores active customer data.",
+          "description": "Stores one year customer data.",
           "params": [
             {
               "name": "customerId",
-              "description": "Unique identifier for the active customer."
+              "description": "Unique identifier for the one year customer."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/one_month_customers/{customerId}",
+        "definition": {
+          "entityName": "Customer",
+          "schema": {
+            "$ref": "#/backend/entities/Customer"
+          },
+          "description": "Stores one month customer data.",
+          "params": [
+            {
+              "name": "customerId",
+              "description": "Unique identifier for the one month customer."
             }
           ]
         }
@@ -86,6 +102,8 @@
         }
       }
     ],
-    "reasoning": "The Firestore structure is designed to ensure authorization independence, clarity, and scalability for the Customer Hub application.  \n\nThe structure segregates active and pending customers into separate collections: `/active_customers` and `/pending_customers`. This segregation simplifies security rules as each collection has distinct access requirements.\n\nAuthorization Independence: The structure does not rely on hierarchical `get()` calls. Security rules can operate independently on each document based on its attributes.\n\nQAPs Support: The segregated structure enables secure `list` operations by ensuring that rules can be applied consistently to all documents within a collection, preventing unauthorized access. No filtering is needed within the rules themselves.\n\nThe choice of separate collections avoids mixing customer status within a single collection, making rules simpler and more efficient. The structure also facilitates future expansion and feature additions without compromising data integrity or security."
+    "reasoning": "The Firestore structure is designed to ensure authorization independence, clarity, and scalability for the Customer Hub application. The structure segregates customers into separate collections based on their tenure/status: `/one_year_customers`, `/one_month_customers`, and `/pending_customers`. This segregation simplifies security rules as each collection has distinct access requirements. Authorization Independence: The structure does not rely on hierarchical `get()` calls. Security rules can operate independently on each document based on its attributes. QAPs Support: The segregated structure enables secure `list` operations by ensuring that rules can be applied consistently to all documents within a collection, preventing unauthorized access. No filtering is needed within the rules themselves. The choice of separate collections avoids mixing customer status within a single collection, making rules simpler and more efficient. The structure also facilitates future expansion and feature additions without compromising data integrity or security."
   }
 }
+
+    

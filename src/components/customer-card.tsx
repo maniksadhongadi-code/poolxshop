@@ -1,15 +1,20 @@
+
 "use client";
 
 import type { Customer } from "@/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Trash2, ArrowRightLeft, MoreVertical, CalendarIcon } from "lucide-react";
+import { Trash2, ArrowRightLeft, MoreVertical, CalendarIcon, Check } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -27,15 +32,15 @@ import { format } from "date-fns";
 
 type CustomerCardProps = {
   customer: Customer;
-  listType: "pending" | "active";
-  onSwitch: (customer: Customer, from: "pending" | "active") => void;
+  onSwitch: (customer: Customer, to: "one_year" | "one_month" | "pending") => void;
   onDelete?: (customerId: string) => void;
 };
 
-export function CustomerCard({ customer, listType, onSwitch, onDelete }: CustomerCardProps) {
-  const switchLabel = listType === "pending" ? "Move to Active" : "Move to Pending";
-  
+export function CustomerCard({ customer, onSwitch, onDelete }: CustomerCardProps) {
   const formattedDate = customer.createdAt && customer.createdAt.toDate ? format(customer.createdAt.toDate(), "MMMM d, yyyy") : 'Date not available';
+  const currentStatus = customer.status;
+
+  const availableStatuses: ("one_year" | "one_month" | "pending")[] = ["one_year", "one_month", "pending"];
 
   return (
     <Card className="transition-shadow duration-300 hover:shadow-xl">
@@ -51,10 +56,27 @@ export function CustomerCard({ customer, listType, onSwitch, onDelete }: Custome
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onSwitch(customer, listType)}>
-              <ArrowRightLeft className="mr-2" />
-              <span>{switchLabel}</span>
-            </DropdownMenuItem>
+             <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                    <ArrowRightLeft className="mr-2" />
+                    <span>Move to...</span>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuPortal>
+                    <DropdownMenuSubContent>
+                        {availableStatuses.map(status => (
+                             <DropdownMenuItem 
+                                key={status} 
+                                onSelect={() => onSwitch(customer, status)}
+                                disabled={currentStatus === status}
+                              >
+                                {currentStatus === status ? <Check className="mr-2 h-4 w-4" /> : <span className="w-8"></span>}
+                                {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
+                            </DropdownMenuItem>
+                        ))}
+                    </DropdownMenuSubContent>
+                </DropdownMenuPortal>
+            </DropdownMenuSub>
+
             {onDelete && (
               <>
                 <DropdownMenuSeparator />
@@ -100,3 +122,5 @@ export function CustomerCard({ customer, listType, onSwitch, onDelete }: Custome
     </Card>
   );
 }
+
+    

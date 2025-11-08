@@ -4,7 +4,11 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // Allow any authenticated user to manage customers
-    match /active_customers/{customerId} {
+    match /one_year_customers/{customerId} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /one_month_customers/{customerId} {
       allow read, write: if request.auth != null;
     }
 
@@ -13,3 +17,5 @@ service cloud.firestore {
     }
   }
 }
+
+    

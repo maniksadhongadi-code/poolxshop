@@ -1,3 +1,4 @@
+
 import type { Timestamp } from "firebase/firestore";
 
 export type Customer = {
@@ -5,6 +6,8 @@ export type Customer = {
   name: string;
   email: string;
   phoneNumber: string;
-  status: 'pending' | 'active';
+  status: 'one_year' | 'one_month' | 'pending';
   createdAt: Timestamp;
 };
+
+    
