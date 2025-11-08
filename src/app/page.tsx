@@ -45,25 +45,16 @@ export default function Home() {
   }, []);
 
   const firebaseState = useFirebase();
-
-  // Handle case where firebase is not ready yet
-  if (!firebaseState) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p>Loading...</p>
-      </div>
-    );
-  }
-
-  const { auth, firestore, user, isUserLoading } = firebaseState;
   
   // This effect handles the anonymous sign-in logic.
   useEffect(() => {
     // Only run if client is ready, password is authenticated, and we have an auth instance.
-    if (isClientReady && isAuthenticated && auth && !user && !isUserLoading) {
-      initiateAnonymousSignIn(auth);
+    if (isClientReady && isAuthenticated && firebaseState?.auth && !firebaseState?.user && !firebaseState?.isUserLoading) {
+      initiateAnonymousSignIn(firebaseState.auth);
     }
-  }, [isClientReady, isAuthenticated, auth, user, isUserLoading]);
+  }, [isClientReady, isAuthenticated, firebaseState]);
+
+  const { firestore, user } = firebaseState || {};
 
   // Memoize Firestore references. They will be null until auth is ready and a user exists.
   const activeCustomersRef = useMemoFirebase(() =>
@@ -201,9 +192,9 @@ export default function Home() {
   
   const customersToShow = view === 'active' ? activeCustomers : pendingCustomers;
   const title = view === 'active' ? "Active Customers" : "Pending Customers";
-  const isLoading = !isClientReady || isUserLoading || (isAuthenticated && (!user || isActiveLoading || isPendingLoading));
+  const isLoading = !isClientReady || !firebaseState || firebaseState.isUserLoading || (isAuthenticated && (!user || isActiveLoading || isPendingLoading));
 
-  if (!isClientReady) {
+  if (!isClientReady || !firebaseState) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <p>Loading...</p>
