@@ -1,21 +1,15 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Allow any authenticated user to manage customers
-    match /one_year_customers/{customerId} {
-      allow read, write: if request.auth != null;
+    // Function to check if a user is signed in
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    match /one_month_customers/{customerId} {
-      allow read, write: if request.auth != null;
-    }
-
-    match /pending_customers/{customerId} {
-      allow read, write: if request.auth != null;
+    // Apply the same rule to all customer collections
+    match /{customerCollection}/{customerId} where customerCollection in ['one_year_customers', 'one_month_customers', 'pending_customers'] {
+      allow read, write: if isSignedIn();
     }
   }
 }
-
-    
