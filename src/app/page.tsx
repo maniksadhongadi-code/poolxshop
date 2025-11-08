@@ -32,26 +32,22 @@ export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isClientReady, setIsClientReady] = useState(false);
 
-  // This effect runs once on the client to check for password authentication status.
   useEffect(() => {
     const storedAuth = localStorage.getItem("is-authenticated") === "true";
     setIsAuthenticated(storedAuth);
-    setIsClientReady(true); // Indicate that client-side checks are done.
+    setIsClientReady(true);
   }, []);
 
   const firebaseState = useFirebase();
   
-  // This effect handles the anonymous sign-in logic.
   useEffect(() => {
-    // Only run if client is ready, password is authenticated, and we have an auth instance.
     if (isClientReady && isAuthenticated && firebaseState?.auth && !firebaseState?.user && !firebaseState?.isUserLoading) {
       initiateAnonymousSignIn(firebaseState.auth);
     }
   }, [isClientReady, isAuthenticated, firebaseState]);
 
-  const { firestore, user } = firebaseState || {};
+  const { firestore, user, isUserLoading } = firebaseState || {};
 
-  // Memoize Firestore references. They will be null until auth is ready and a user exists.
   const oneYearCustomersRef = useMemoFirebase(() =>
     (firestore && user) ? collection(firestore, 'one_year_customers') : null,
     [firestore, user]
@@ -85,13 +81,13 @@ export default function Home() {
       email: newCustomer.email,
       phoneNumber: newCustomer.phone,
       createdAt: serverTimestamp(),
+      status: view,
     };
     
-    const status = view;
     let targetRef;
-    if (status === 'one_year') {
+    if (view === 'one_year') {
       targetRef = oneYearCustomersRef;
-    } else if (status === 'one_month') {
+    } else if (view === 'one_month') {
         targetRef = oneMonthCustomersRef;
     } else {
       targetRef = pendingCustomersRef;
@@ -102,10 +98,10 @@ export default function Home() {
        return;
     }
 
-    addDocumentNonBlocking(targetRef, {...customerData, status: status});
+    addDocumentNonBlocking(targetRef, customerData);
     toast({
       title: "Customer Added",
-      description: `${newCustomer.name} has been added to the ${status.replace('_', ' ')} list.`,
+      description: `${newCustomer.name} has been added to the ${view.replace('_', ' ')} list.`,
     });
     setAddDialogOpen(false);
   };
@@ -113,14 +109,8 @@ export default function Home() {
   const handleDeleteCustomer = (customerId: string, currentStatus: "one_year" | "one_month" | "pending") => {
     if (!firestore) return;
     
-    let docRef;
-    if (currentStatus === 'one_year') {
-      docRef = doc(firestore, "one_year_customers", customerId);
-    } else if (currentStatus === 'one_month') {
-        docRef = doc(firestore, "one_month_customers", customerId);
-    } else {
-      docRef = doc(firestore, "pending_customers", customerId);
-    }
+    let collectionName = `${currentStatus}_customers`;
+    const docRef = doc(firestore, collectionName, customerId);
     
     deleteDocumentNonBlocking(docRef);
     
@@ -132,112 +122,99 @@ export default function Home() {
   };
   
   const handleSwitchCustomer = async (customer: Customer, to: "one_year" | "one_month" | "pending") => {
-    if (!firestore) return;
-    const batch = writeBatch(firestore);
-    const from = customer.status as "one_year" | "one_month" | "pending";
+    if (!firestore || !customer.id) return;
+    const from = customer.status;
 
     if (from === to) return;
 
-    let fromRef;
-    if (from === 'one_year') {
-      fromRef = doc(firestore, 'one_year_customers', customer.id);
-    } else if (from === 'one_month') {
-      fromRef = doc(firestore, 'one_month_customers', customer.id);
-    } else {
-      fromRef = doc(firestore, 'pending_customers', customer.id);
-    }
+    const batch = writeBatch(firestore);
+
+    const fromCollection = `${from}_customers`;
+    const fromRef = doc(firestore, fromCollection, customer.id);
     
-    let toRef;
-    if (to === 'one_year') {
-      toRef = doc(firestore, 'one_year_customers', customer.id);
-    } else if (to === 'one_month') {
-      toRef = doc(firestore, 'one_month_customers', customer.id);
-    } else {
-      toRef = doc(firestore, 'pending_customers', customer.id);
-    }
+    const toCollection = `${to}_customers`;
+    const toRef = doc(firestore, toCollection, customer.id);
+
+    // Create a new object for the destination, ensuring we have all fields
+    const newCustomerData = {
+        ...customer,
+        status: to,
+    };
 
     batch.delete(fromRef);
-    batch.set(toRef, { ...customer, status: to });
+    batch.set(toRef, newCustomerData);
 
-    await batch.commit().catch(error => {
+    try {
+        await batch.commit();
+        toast({
+            title: "Customer Moved",
+            description: `${customer.name} moved to ${to.replace('_', ' ')} list.`,
+        });
+    } catch (error) {
        console.error("Error switching customer:", error);
        toast({
          title: "Error switching customer",
          description: "Could not update customer status.",
          variant: "destructive",
        });
-    });
-
-    toast({
-        title: "Customer Moved",
-        description: `${customer.name} moved to ${to.replace('_', ' ')} list.`,
-      });
+    }
   };
-
 
   const handleDownload = () => {
     let customersToDownload: Customer[] | null | undefined;
-    if (view === 'one_year') {
-        customersToDownload = oneYearCustomers;
-    } else if (view === 'one_month') {
-        customersToDownload = oneMonthCustomers;
-    } else {
-        customersToDownload = pendingCustomers;
+    let currentViewName: string;
+
+    switch (view) {
+        case 'one_year':
+            customersToDownload = oneYearCustomers;
+            currentViewName = "One Year";
+            break;
+        case 'one_month':
+            customersToDownload = oneMonthCustomers;
+            currentViewName = "One Month";
+            break;
+        case 'pending':
+            customersToDownload = pendingCustomers;
+            currentViewName = "Pending";
+            break;
+        default:
+            customersToDownload = [];
+            currentViewName = "Customers"
     }
 
     if (!customersToDownload || customersToDownload.length === 0) {
-      toast({ title: "No Data", description: `There are no ${view.replace('_', ' ')} customers to download.`, variant: "destructive" });
+      toast({ title: "No Data", description: `There are no ${currentViewName.toLowerCase()} customers to download.`, variant: "destructive" });
       return;
     }
 
     const dataForSheet = customersToDownload.map(customer => ({
-      Name: customer.name,
-      'Mobile Number': String(customer.phoneNumber), // Ensure phone number is a string
+      'Name': customer.name,
+      'Mobile Number': String(customer.phoneNumber),
       'Activation Date': customer.createdAt ? format(customer.createdAt.toDate(), 'MMMM d, yyyy') : 'N/A'
     }));
     
-    const worksheet = XLSX.utils.json_to_sheet(dataForSheet, {
-      skipHeader: false,
-    });
+    const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
     
     worksheet['!cols'] = [
-        { wch: 25 }, // Name
-        { wch: 20 }, // Mobile Number
-        { wch: 20 }  // Activation Date
+        { wch: 25 },
+        { wch: 25 },
+        { wch: 20 }
     ];
     
     const workbook = XLSX.utils.book_new();
-    const sheetName = `${view.charAt(0).toUpperCase() + view.slice(1).replace('_', ' ')} Customers`;
+    const sheetName = `${currentViewName} Customers`;
     XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
     XLSX.writeFile(workbook, `${sheetName}.xlsx`);
 
      toast({
       title: "Download Started",
-      description: `Your ${view.replace('_', ' ')} customer list is downloading.`,
+      description: `Your ${currentViewName.toLowerCase()} customer list is downloading.`,
     });
   };
   
-  let customersToShow: Customer[] | null | undefined;
-  let title: string;
-  let isLoading: boolean;
+  const overallIsLoading = !isClientReady || (isAuthenticated && (isUserLoading || !user));
 
-    if (view === 'one_year') {
-        customersToShow = oneYearCustomers;
-        title = "One Year Customers";
-        isLoading = isOneYearLoading;
-    } else if (view === 'one_month') {
-        customersToShow = oneMonthCustomers;
-        title = "One Month Customers";
-        isLoading = isOneMonthLoading;
-    } else {
-        customersToShow = pendingCustomers;
-        title = "Pending Customers";
-        isLoading = isPendingLoading;
-    }
-
-  const overallIsLoading = !isClientReady || !firebaseState || firebaseState.isUserLoading || (isAuthenticated && (!user || isLoading));
-
-  if (!isClientReady || !firebaseState) {
+  if (!isClientReady) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <p>Loading...</p>
@@ -247,6 +224,14 @@ export default function Home() {
 
   if (!isAuthenticated) {
     return <PasswordProtection onAuthenticated={handlePasswordAuthenticated} />;
+  }
+  
+  if (overallIsLoading && isAuthenticated) {
+     return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p>Authenticating and loading customers...</p>
+      </div>
+    );
   }
 
   return (
@@ -284,20 +269,20 @@ export default function Home() {
           </div>
         </header>
 
-        <Tabs value={view} onValueChange={(value) => setView(value as any)} className="w-full">
+        <Tabs value={view} onValueChange={(value) => setView(value as "one_year" | "one_month" | "pending")} className="w-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="one_year">One Year</TabsTrigger>
             <TabsTrigger value="one_month">One Month</TabsTrigger>
             <TabsTrigger value="pending">Pending</TabsTrigger>
           </TabsList>
           <TabsContent value="one_year">
-            {renderCustomerList(oneYearCustomers, overallIsLoading, "one_year")}
+            {renderCustomerList(oneYearCustomers, isOneYearLoading || overallIsLoading, "one year")}
           </TabsContent>
           <TabsContent value="one_month">
-            {renderCustomerList(oneMonthCustomers, overallIsLoading, "one_month")}
+            {renderCustomerList(oneMonthCustomers, isOneMonthLoading || overallIsLoading, "one month")}
           </TabsContent>
           <TabsContent value="pending">
-            {renderCustomerList(pendingCustomers, overallIsLoading, "pending")}
+            {renderCustomerList(pendingCustomers, isPendingLoading || overallIsLoading, "pending")}
           </TabsContent>
         </Tabs>
 
@@ -305,31 +290,32 @@ export default function Home() {
     </main>
   );
 
-  function renderCustomerList(customers: Customer[] | null | undefined, loading: boolean, listType: 'one_year' | 'one_month' | 'pending') {
+  function renderCustomerList(customers: Customer[] | null | undefined, loading: boolean, listName: string) {
+    if (loading) {
+      return <div className="pt-4"><p>Loading {listName} customers...</p></div>;
+    }
+    
+    if (!customers || customers.length === 0) {
+       return (
+         <div className="flex items-center justify-center h-48 rounded-lg border-2 border-dashed border-border text-muted-foreground p-8 mt-4">
+            <p>No {listName} customers.</p>
+          </div>
+       )
+    }
+
     return (
       <section>
         <div className="space-y-4 pt-4">
-          {loading && <p>Loading customers...</p>}
-          {!loading && customers && customers.length > 0 ? (
-            customers.map(customer => (
-              <CustomerCard
-                key={customer.id}
-                customer={customer}
-                onSwitch={handleSwitchCustomer}
-                onDelete={(id) => handleDeleteCustomer(id, listType)}
-              />
-            ))
-          ) : (
-            !loading && (
-              <div className="flex items-center justify-center h-48 rounded-lg border-2 border-dashed border-border text-muted-foreground p-8">
-                <p>No {listType.replace('_', ' ')} customers.</p>
-              </div>
-            )
-          )}
+          {customers.map(customer => (
+            <CustomerCard
+              key={customer.id}
+              customer={customer}
+              onSwitch={handleSwitchCustomer}
+              onDelete={(id) => handleDeleteCustomer(id, customer.status)}
+            />
+          ))}
         </div>
       </section>
     );
   }
 }
-
-    
